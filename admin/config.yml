@@ -6,8 +6,9 @@
 # ============================================================
 
 backend:
-  name: git-gateway          # login gestito da Netlify Identity
-  branch: main               # metti il nome del tuo branch principale
+  name: github                              # login via GitHub, tramite l'OAuth proxy di Netlify
+  repo: Picciorra/marcopiccinelliArtist     # utente/repo su GitHub
+  branch: main                              # nome del branch principale
 
 # Cartella dove finiscono le foto caricate dal pannello
 media_folder: "images/opere"
