@@ -1,0 +1,75 @@
+# ============================================================
+# Configurazione CMS (Decap) per la galleria di Marco Piccinelli
+# Il pannello vive su  https://TUO-SITO/admin/
+# Le modifiche vengono salvate come commit su GitHub e il sito
+# si aggiorna da solo. Non serve toccare il codice.
+# ============================================================
+
+backend:
+  name: git-gateway          # login gestito da Netlify Identity
+  branch: main               # metti il nome del tuo branch principale
+
+# Cartella dove finiscono le foto caricate dal pannello
+media_folder: "images/opere"
+public_folder: "/images/opere"
+
+# Lingua del pannello
+locale: "it"
+
+collections:
+  - name: "galleria"
+    label: "Galleria 3D"
+    delete: false
+    files:
+      - name: "opere"
+        label: "Opere"
+        file: "opere.json"
+        description: "Aggiungi, modifica o riordina le opere della galleria."
+        fields:
+          - label: "Opere"
+            name: "opere"
+            widget: "list"
+            label_singular: "Opera"
+            summary: "{{fields.t}} ({{fields.y}})"
+            fields:
+              - { label: "Titolo", name: "t", widget: "string" }
+              - { label: "Anno", name: "y", widget: "string" }
+              - { label: "Dimensioni", name: "d", widget: "string", hint: "es. 90 × 72 cm" }
+              - label: "Stato"
+                name: "st"
+                widget: "select"
+                options:
+                  - { label: "Disponibile", value: "available" }
+                  - { label: "Venduta", value: "sold" }
+                default: "available"
+              - label: "Parete"
+                name: "wall"
+                widget: "select"
+                options:
+                  - { label: "In fondo", value: "back" }
+                  - { label: "Sinistra", value: "left" }
+                  - { label: "Destra", value: "right" }
+                default: "back"
+                hint: "Su quale parete della sala appendere l'opera"
+              - label: "Posizione sulla parete"
+                name: "u"
+                widget: "number"
+                default: 0
+                value_type: "float"
+                hint: "0 = centro. Numeri negativi/positivi spostano a sinistra/destra (es. -2.2 o 2.2)"
+              - label: "Foto dell'opera"
+                name: "image"
+                widget: "image"
+                required: false
+                hint: "Carica la foto. Se vuota, viene mostrata una texture segnaposto."
+              - label: "Seed segnaposto"
+                name: "seed"
+                widget: "number"
+                default: 11
+                required: false
+                hint: "Solo se non carichi una foto: cambia il disegno generato"
+              - label: "Palette segnaposto (0-3)"
+                name: "pi"
+                widget: "number"
+                default: 0
+                required: false

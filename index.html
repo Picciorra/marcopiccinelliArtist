@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marco Piccinelli — Galleria virtuale 3D</title>
+<style>
+  :root{--gold:#c69a2e;--cream:#efe9df;}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#0e0c0a;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--cream)}
+  #app{position:fixed;inset:0}
+  canvas{display:block;cursor:grab}
+  canvas:active{cursor:grabbing}
+
+  /* --- UI overlay --- */
+  .ui{position:fixed;z-index:10;pointer-events:none;user-select:none}
+  .title{top:26px;left:30px}
+  .title h1{font-size:22px;font-weight:800;letter-spacing:.04em}
+  .title p{font-size:13px;color:#b6ab97;margin-top:4px;letter-spacing:.06em}
+  .hint{bottom:26px;left:50%;transform:translateX(-50%);text-align:center;
+    font-size:13px;letter-spacing:.08em;color:#cdc2b0;
+    background:rgba(20,16,12,.5);padding:10px 18px;border:1px solid rgba(255,255,255,.1);
+    border-radius:40px;backdrop-filter:blur(6px);transition:opacity .6s}
+  .hint b{color:var(--gold);font-weight:600}
+
+  /* caption panel */
+  .caption{position:fixed;z-index:12;right:30px;top:50%;transform:translateY(-50%) translateX(30px);
+    width:min(300px,80vw);background:rgba(18,15,11,.82);backdrop-filter:blur(14px);
+    border:1px solid rgba(198,154,46,.35);padding:26px 26px 24px;border-radius:4px;
+    opacity:0;pointer-events:none;transition:opacity .45s,transform .45s}
+  .caption.show{opacity:1;transform:translateY(-50%) translateX(0)}
+  .caption .k{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold)}
+  .caption h2{font-size:24px;font-weight:800;margin:10px 0 4px;letter-spacing:.01em;line-height:1.1}
+  .caption .yr{font-size:14px;color:#b6ab97;margin-bottom:16px}
+  .caption .row{display:flex;justify-content:space-between;font-size:14px;padding:9px 0;
+    border-top:1px solid rgba(255,255,255,.1);color:#d8cdba}
+  .caption .row span:first-child{color:#8f8474}
+  .badge{display:inline-block;margin-top:16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    padding:5px 12px;color:#fff;border-radius:2px}
+  .badge.available{background:#3f7ea8}.badge.sold{background:#8a4a3f}
+  .caption .close{pointer-events:auto;cursor:pointer;margin-top:20px;font-size:12px;
+    letter-spacing:.1em;text-transform:uppercase;color:#8f8474;border-bottom:1px solid #8f8474;
+    display:inline-block;padding-bottom:2px}
+  .caption .close:hover{color:var(--gold);border-color:var(--gold)}
+
+  .loader{position:fixed;inset:0;z-index:20;background:#0e0c0a;display:flex;align-items:center;
+    justify-content:center;flex-direction:column;gap:16px;transition:opacity .8s}
+  .loader.hide{opacity:0;pointer-events:none}
+  .loader .ring{width:40px;height:40px;border:3px solid rgba(198,154,46,.25);border-top-color:var(--gold);
+    border-radius:50%;animation:spin 1s linear infinite}
+  .loader p{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#8f8474}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="ui title"><h1>Marco Piccinelli</h1><p>GALLERIA VIRTUALE · ILLUSIONI ONIRICHE</p></div>
+<div class="ui hint" id="hint"><b>Trascina</b> per guardarti intorno · <b>Clicca</b> un'opera</div>
+
+<div class="caption" id="caption">
+  <div class="k">Opera</div>
+  <h2 id="cTitle"></h2>
+  <div class="yr" id="cYear"></div>
+  <div class="row"><span>Tecnica</span><span>Inchiostro su MDF</span></div>
+  <div class="row"><span>Dimensioni</span><span id="cDims"></span></div>
+  <div class="row"><span>Stato</span><span id="cStatusText"></span></div>
+  <span class="badge" id="cBadge"></span><br>
+  <span class="close" id="cClose">Torna alla galleria ✕</span>
+</div>
+
+<div class="loader" id="loader"><div class="ring"></div><p>Allestimento della galleria…</p></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================
+   GALLERIA 3D — Marco Piccinelli
+   Three.js r128. Le opere sono texture generate su canvas
+   (stile "cloisonné"): per le foto vere basta sostituire
+   makeArtCanvas() con un THREE.TextureLoader().load('opera.jpg').
+========================================================= */
+const THREEc = window.THREE;
+
+/* ---- generatore texture opera (canvas 2D) ---- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const PALS=[
+  {bg:'#2b2019',c:['#c69a2e','#8a6d1f','#6f8a86','#c3a79c','#b7c3c6','#3d5c6b','#d9c48a']},
+  {bg:'#1f2a30',c:['#2f7fbf','#c69a2e','#c0392b','#6f8a86','#d9c48a','#28516b','#b7c3c6']},
+  {bg:'#3a1f1c',c:['#c0392b','#c69a2e','#8a6d1f','#c3a79c','#6f8a86','#7a2b22','#e0cf9e']},
+  {bg:'#26221a',c:['#c69a2e','#b7c3c6','#6f8a86','#8a6d1f','#c3a79c','#4a3f2a','#d9c48a']}
+];
+function makeArtCanvas(seed,pi,W=512,H=640){
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const x=cv.getContext('2d');const rnd=mulberry32(seed);const P=PALS[pi%PALS.length];
+  x.fillStyle=P.bg;x.fillRect(0,0,W,H);
+  const step=54;
+  for(let gy=-10;gy<H+step;gy+=step){
+    for(let gx=-10;gx<W+step;gx+=step){
+      const cx=gx+(rnd()-.5)*step*.9, cy=gy+(rnd()-.5)*step*.9;
+      const r=step*.36+rnd()*step*.44;
+      const pts=6+((rnd()*3)|0);
+      x.beginPath();
+      for(let i=0;i<pts;i++){
+        const a=(i/pts)*Math.PI*2, rr=r*(.72+rnd()*.5);
+        const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr*1.05;
+        i?x.lineTo(px,py):x.moveTo(px,py);
+      }
+      x.closePath();
+      x.fillStyle=P.c[(rnd()*P.c.length)|0];x.fill();
+      x.lineWidth=3;x.strokeStyle='#141008';x.stroke();
+    }
+  }
+  for(let k=0;k<2;k++){
+    const y0=H*(.2+rnd()*.5), gold=k?'#8a6d1f':'#c69a2e';
+    x.beginPath();x.moveTo(-20,y0);
+    x.bezierCurveTo(W*.3,y0-90+rnd()*60,W*.6,y0+120-rnd()*60,W+20,y0-40);
+    x.lineWidth=22+rnd()*18;x.strokeStyle=gold;x.lineCap='round';x.stroke();
+  }
+  return cv;
+}
+
+/* ---- dati opere di FALLBACK ----
+   Usati solo se opere.json non è raggiungibile (es. aprendo il file
+   con doppio clic da disco). Online il sito legge opere.json, gestito
+   dal CMS. Non serve modificare questa lista: si edita opere.json. ---- */
+const FALLBACK=[
+  {t:'Ostrega e champagne',y:'2022',d:'90 × 72 cm',st:'available',seed:11,pi:0,wall:'back',u:0},
+  {t:'Il tempo della lumaca',y:'2022',d:'90 × 72 cm',st:'available',seed:23,pi:1,wall:'left',u:-2.2},
+  {t:'Ruota della fortuna',y:'2023',d:'70 × 50 cm',st:'sold',seed:37,pi:2,wall:'left',u:2.2},
+  {t:'Battaglia silente',y:'2023',d:'90 × 72 cm',st:'available',seed:52,pi:3,wall:'right',u:-2.2},
+  {t:'Mappa dell\'inconscio',y:'2024',d:'100 × 80 cm',st:'available',seed:78,pi:1,wall:'right',u:2.2}
+];
+
+/* ---- scene ---- */
+const app=document.getElementById('app');
+const scene=new THREEc.Scene();
+scene.background=new THREEc.Color('#171310');
+scene.fog=new THREEc.Fog('#171310',9,26);
+
+const camera=new THREEc.PerspectiveCamera(62,innerWidth/innerHeight,.1,100);
+const CAM=new THREEc.Vector3(0,1.65,4.2);
+camera.position.copy(CAM);
+
+const renderer=new THREEc.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREEc.PCFSoftShadowMap;
+renderer.outputEncoding=THREEc.sRGBEncoding;
+renderer.toneMapping=THREEc.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+app.appendChild(renderer.domElement);
+
+/* room */
+const RW=12,RD=12,RH=5;
+const wallMat=new THREEc.MeshStandardMaterial({color:'#e7e0d3',roughness:.96,metalness:0});
+const floorMat=new THREEc.MeshStandardMaterial({color:'#c9c0b0',roughness:.7,metalness:.05});
+const ceilMat=new THREEc.MeshStandardMaterial({color:'#d8d1c4',roughness:1});
+
+function plane(w,h,mat){return new THREEc.Mesh(new THREEc.PlaneGeometry(w,h),mat);}
+// floor
+const floor=plane(RW,RD,floorMat);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+// ceiling
+const ceil=plane(RW,RD,ceilMat);ceil.rotation.x=Math.PI/2;ceil.position.y=RH;scene.add(ceil);
+// back wall
+const back=plane(RW,RH,wallMat);back.position.set(0,RH/2,-RD/2);back.receiveShadow=true;scene.add(back);
+// front wall (behind camera)
+const front=plane(RW,RH,wallMat);front.position.set(0,RH/2,RD/2);front.rotation.y=Math.PI;scene.add(front);
+// left wall
+const left=plane(RD,RH,wallMat);left.position.set(-RW/2,RH/2,0);left.rotation.y=Math.PI/2;left.receiveShadow=true;scene.add(left);
+// right wall
+const right=plane(RD,RH,wallMat);right.position.set(RW/2,RH/2,0);right.rotation.y=-Math.PI/2;right.receiveShadow=true;scene.add(right);
+// simple bench in the middle
+const bench=new THREEc.Mesh(new THREEc.BoxGeometry(2.4,.45,.7),
+  new THREEc.MeshStandardMaterial({color:'#efeae1',roughness:.8}));
+bench.position.set(0,.22,.5);bench.castShadow=true;bench.receiveShadow=true;scene.add(bench);
+
+/* lighting */
+scene.add(new THREEc.HemisphereLight('#fff6e8','#3a332a',.55));
+const amb=new THREEc.AmbientLight('#ffffff',.18);scene.add(amb);
+
+/* artworks */
+const clickable=[];
+const texLoader=new THREEc.TextureLoader();texLoader.crossOrigin='anonymous';
+function addArtwork(a){
+  const aw=2, ah=2.5, maxW=aw*.9, maxH=ah*.9;
+  const grp=new THREEc.Group();
+  // frame (black box)
+  const frame=new THREEc.Mesh(new THREEc.BoxGeometry(aw+.22,ah+.22,.09),
+    new THREEc.MeshStandardMaterial({color:'#111',roughness:.5,metalness:.2}));
+  frame.castShadow=true;grp.add(frame);
+  // matte
+  const matte=new THREEc.Mesh(new THREEc.PlaneGeometry(aw+.02,ah+.02),
+    new THREEc.MeshStandardMaterial({color:'#f4efe6',roughness:1}));
+  matte.position.z=.05;grp.add(matte);
+  // artwork surface — real photo if provided, else generated texture
+  const artMat=new THREEc.MeshStandardMaterial({color:'#ffffff',roughness:.85});
+  const art=new THREEc.Mesh(new THREEc.PlaneGeometry(maxW,maxH),artMat);
+  art.position.z=.055;grp.add(art);
+  art.userData=a;clickable.push(art);
+  if(a.image){
+    texLoader.load(a.image,tex=>{
+      tex.encoding=THREEc.sRGBEncoding;artMat.map=tex;artMat.needsUpdate=true;
+      const img=tex.image, ir=img.width/img.height;         // fit foto reale nella cornice
+      let w=maxW,h=w/ir; if(h>maxH){h=maxH;w=h*ir;}
+      art.scale.set(w/maxW,h/maxH,1);
+      matte.scale.set((w+.04)/(aw+.02),(h+.04)/(ah+.02),1);
+    },undefined,()=>{                                        // se l'immagine non carica, fallback texture
+      const t=new THREEc.CanvasTexture(makeArtCanvas(a.seed||11,a.pi||0));
+      t.encoding=THREEc.sRGBEncoding;artMat.map=t;artMat.needsUpdate=true;
+    });
+  }else{
+    const t=new THREEc.CanvasTexture(makeArtCanvas(a.seed||11,a.pi||0));
+    t.encoding=THREEc.sRGBEncoding;artMat.map=t;artMat.needsUpdate=true;
+  }
+
+  const y=1.75;
+  if(a.wall==='back'){grp.position.set(a.u,y,-RD/2+.06);}
+  if(a.wall==='left'){grp.position.set(-RW/2+.06,y,a.u);grp.rotation.y=Math.PI/2;}
+  if(a.wall==='right'){grp.position.set(RW/2-.06,y,a.u);grp.rotation.y=-Math.PI/2;}
+  scene.add(grp);
+
+  // spotlight on the piece
+  const sp=new THREEc.SpotLight('#fff3df',10,9,Math.PI/7,.5,1.4);
+  const n=new THREEc.Vector3();grp.getWorldDirection(n); // frame faces +z of group
+  sp.position.set(grp.position.x+n.x*2.2,4.3,grp.position.z+n.z*2.2);
+  sp.target=grp;sp.castShadow=true;sp.shadow.mapSize.set(1024,1024);
+  sp.shadow.camera.near=.5;sp.shadow.camera.far=12;
+  scene.add(sp);scene.add(sp.target);
+}
+/* carica le opere dal CMS (opere.json); fallback ai dati inline */
+(async function loadOpere(){
+  let list=FALLBACK;
+  try{
+    const r=await fetch('opere.json',{cache:'no-store'});
+    if(r.ok){const j=await r.json(); if(j&&Array.isArray(j.opere)&&j.opere.length) list=j.opere;}
+  }catch(e){/* file:// o offline → uso il fallback */}
+  list.forEach(addArtwork);
+})();
+
+/* =========================================================
+   INTERAZIONE — look con drag (yaw/pitch) + focus al clic
+========================================================= */
+let yaw=0,pitch=0,tYaw=0,tPitch=0;
+let dragging=false,lastX=0,lastY=0,moved=0;
+const dir=new THREEc.Vector3();
+function applyLook(){
+  const cy=Math.cos(pitch);
+  dir.set(Math.sin(yaw)*cy,Math.sin(pitch),-Math.cos(yaw)*cy);
+  camera.lookAt(camera.position.x+dir.x,camera.position.y+dir.y,camera.position.z+dir.z);
+}
+const cvEl=renderer.domElement;
+cvEl.addEventListener('pointerdown',e=>{dragging=true;moved=0;lastX=e.clientX;lastY=e.clientY;cvEl.setPointerCapture(e.pointerId);});
+cvEl.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+  tYaw-=dx*.004;tPitch-=dy*.004;
+  tPitch=Math.max(-.5,Math.min(.5,tPitch));
+  hideHint();
+});
+cvEl.addEventListener('pointerup',e=>{
+  dragging=false;
+  if(moved<6) onClick(e); // treat as click if not dragged
+});
+
+/* raycast click → focus artwork */
+const ray=new THREEc.Raycaster();const ndc=new THREEc.Vector2();
+const capEl=document.getElementById('caption');
+function onClick(e){
+  ndc.x=(e.clientX/innerWidth)*2-1;ndc.y=-(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObjects(clickable,false)[0];
+  if(hit){focusArt(hit.object);}else{closeCaption();}
+}
+function focusArt(mesh){
+  const a=mesh.userData;
+  // orient camera toward the artwork center
+  const wp=new THREEc.Vector3();mesh.getWorldPosition(wp);
+  const v=wp.clone().sub(camera.position).normalize();
+  tYaw=Math.atan2(v.x,-v.z);
+  tPitch=Math.max(-.5,Math.min(.5,Math.asin(v.y)));
+  // fill caption
+  document.getElementById('cTitle').textContent=a.t;
+  document.getElementById('cYear').textContent=a.y;
+  document.getElementById('cDims').textContent=a.d;
+  const stTxt=a.st==='available'?'Disponibile':'Venduta';
+  document.getElementById('cStatusText').textContent=stTxt;
+  const b=document.getElementById('cBadge');b.textContent=stTxt;b.className='badge '+a.st;
+  capEl.classList.add('show');hideHint();
+}
+function closeCaption(){capEl.classList.remove('show');}
+document.getElementById('cClose').addEventListener('click',closeCaption);
+
+let hintHidden=false;
+function hideHint(){if(hintHidden)return;hintHidden=true;const h=document.getElementById('hint');h.style.opacity=0;}
+
+/* resize */
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+/* idle sway before first interaction */
+let t0=performance.now();
+function animate(){
+  requestAnimationFrame(animate);
+  if(!hintHidden){const e=(performance.now()-t0)/1000;tYaw=Math.sin(e*.25)*.18;}
+  yaw+=(tYaw-yaw)*.08;pitch+=(tPitch-pitch)*.08;
+  applyLook();
+  renderer.render(scene,camera);
+}
+animate();
+
+/* hide loader once first frame is ready */
+requestAnimationFrame(()=>{setTimeout(()=>document.getElementById('loader').classList.add('hide'),350);});
+</script>
+</body>
+</html>

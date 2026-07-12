@@ -1,0 +1,59 @@
+{
+  "opere": [
+    {
+      "t": "Ostrega e champagne",
+      "y": "2022",
+      "d": "90 × 72 cm",
+      "st": "available",
+      "wall": "back",
+      "u": 0,
+      "image": "",
+      "seed": 11,
+      "pi": 0
+    },
+    {
+      "t": "Il tempo della lumaca",
+      "y": "2022",
+      "d": "90 × 72 cm",
+      "st": "available",
+      "wall": "left",
+      "u": -2.2,
+      "image": "",
+      "seed": 23,
+      "pi": 1
+    },
+    {
+      "t": "Ruota della fortuna",
+      "y": "2023",
+      "d": "70 × 50 cm",
+      "st": "sold",
+      "wall": "left",
+      "u": 2.2,
+      "image": "",
+      "seed": 37,
+      "pi": 2
+    },
+    {
+      "t": "Battaglia silente",
+      "y": "2023",
+      "d": "90 × 72 cm",
+      "st": "available",
+      "wall": "right",
+      "u": -2.2,
+      "image": "",
+      "seed": 52,
+      "pi": 3
+    },
+    {
+      "t": "Mappa dell'inconscio",
+      "y": "2024",
+      "d": "100 × 80 cm",
+      "st": "available",
+      "wall": "right",
+      "u": 2.2,
+      "image": "",
+      "seed": 78,
+      "pi": 1
+    }
+  ]
+}
