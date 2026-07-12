@@ -51,13 +51,25 @@
     border-radius:50%;animation:spin 1s linear infinite}
   .loader p{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#8f8474}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* navigation arrows — cambia opera senza doverci cliccare sopra */
+  .navArrow{position:fixed;top:50%;transform:translateY(-50%);z-index:11;width:52px;height:52px;
+    border-radius:50%;background:rgba(20,16,12,.5);border:1px solid rgba(255,255,255,.12);
+    backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;pointer-events:auto;transition:background .25s,border-color .25s;user-select:none}
+  .navArrow:hover{background:rgba(198,154,46,.25);border-color:var(--gold)}
+  .navArrow svg{width:20px;height:20px;stroke:var(--cream);fill:none;stroke-width:2.4;
+    stroke-linecap:round;stroke-linejoin:round}
+  .navArrow.left{left:26px}
+  .navArrow.right{right:26px}
+  @media (max-width:640px){.navArrow{width:42px;height:42px}.navArrow.left{left:12px}.navArrow.right{right:12px}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 
 <div class="ui title"><h1>Marco Piccinelli</h1><p>GALLERIA VIRTUALE · ILLUSIONI ONIRICHE</p></div>
-<div class="ui hint" id="hint"><b>Trascina</b> per guardarti intorno · <b>Clicca</b> un'opera</div>
+<div class="ui hint" id="hint"><b>Trascina</b> per guardarti intorno · <b>Clicca</b> un'opera · <b>‹ ›</b> per cambiare</div>
 
 <div class="caption" id="caption">
   <div class="k">Opera</div>
@@ -69,6 +81,9 @@
   <span class="badge" id="cBadge"></span><br>
   <span class="close" id="cClose">Torna alla galleria ✕</span>
 </div>
+
+<div class="navArrow left" id="navPrev" aria-label="Opera precedente"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+<div class="navArrow right" id="navNext" aria-label="Opera successiva"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
 
 <div class="loader" id="loader"><div class="ring"></div><p>Allestimento della galleria…</p></div>
 
@@ -171,10 +186,48 @@ const front=plane(RW,RH,wallMat);front.position.set(0,RH/2,RD/2);front.rotation.
 const left=plane(RD,RH,wallMat);left.position.set(-RW/2,RH/2,0);left.rotation.y=Math.PI/2;left.receiveShadow=true;scene.add(left);
 // right wall
 const right=plane(RD,RH,wallMat);right.position.set(RW/2,RH/2,0);right.rotation.y=-Math.PI/2;right.receiveShadow=true;scene.add(right);
-// simple bench in the middle
-const bench=new THREEc.Mesh(new THREEc.BoxGeometry(2.4,.45,.7),
-  new THREEc.MeshStandardMaterial({color:'#efeae1',roughness:.8}));
-bench.position.set(0,.22,.5);bench.castShadow=true;bench.receiveShadow=true;scene.add(bench);
+// panchina in legno (doghe + schienale + gambe) al centro della sala
+function makeWoodCanvas(w=256,h=256){
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const x=cv.getContext('2d');const rnd=mulberry32(4);
+  x.fillStyle='#8a5a34';x.fillRect(0,0,w,h);
+  for(let i=0;i<48;i++){
+    const y=rnd()*h;
+    x.strokeStyle=rnd()>.5?'#6b4423':'#a97a4b';
+    x.globalAlpha=.12+rnd()*.22;x.lineWidth=1+rnd()*2;
+    x.beginPath();x.moveTo(0,y);
+    x.bezierCurveTo(w*.3,y+(rnd()-.5)*14,w*.7,y+(rnd()-.5)*14,w,y+(rnd()-.5)*10);
+    x.stroke();
+  }
+  x.globalAlpha=1;
+  return cv;
+}
+const woodTex=new THREEc.CanvasTexture(makeWoodCanvas());
+woodTex.encoding=THREEc.sRGBEncoding;
+const woodMat=new THREEc.MeshStandardMaterial({map:woodTex,roughness:.75,metalness:.05});
+const benchMetalMat=new THREEc.MeshStandardMaterial({color:'#20201f',roughness:.5,metalness:.6});
+
+const benchGroup=new THREEc.Group();
+const slatCount=4,slatW=2.4,slatT=0.05,slatD=0.14,slatGap=0.045;
+const seatDepth=slatCount*slatD+(slatCount-1)*slatGap;
+for(let i=0;i<slatCount;i++){
+  const slat=new THREEc.Mesh(new THREEc.BoxGeometry(slatW,slatT,slatD),woodMat);
+  slat.position.set(0,.45,-seatDepth/2+slatD/2+i*(slatD+slatGap));
+  slat.castShadow=true;slat.receiveShadow=true;benchGroup.add(slat);
+}
+for(let i=0;i<3;i++){
+  const rail=new THREEc.Mesh(new THREEc.BoxGeometry(slatW,slatD,slatT),woodMat);
+  rail.position.set(0,.62+i*.15,seatDepth/2+.04);
+  rail.rotation.x=.18;
+  rail.castShadow=true;benchGroup.add(rail);
+}
+const legGeo=new THREEc.BoxGeometry(.06,.45,.06);
+[[-1.05,-seatDepth/2+.06],[1.05,-seatDepth/2+.06],[-1.05,seatDepth/2-.06],[1.05,seatDepth/2-.06]].forEach(([x,z])=>{
+  const leg=new THREEc.Mesh(legGeo,benchMetalMat);
+  leg.position.set(x,.225,z);leg.castShadow=true;leg.receiveShadow=true;benchGroup.add(leg);
+});
+benchGroup.position.set(0,0,.5);
+scene.add(benchGroup);
 
 /* lighting */
 scene.add(new THREEc.HemisphereLight('#fff6e8','#3a332a',.55));
@@ -271,8 +324,29 @@ function onClick(e){
   ndc.x=(e.clientX/innerWidth)*2-1;ndc.y=-(e.clientY/innerHeight)*2+1;
   ray.setFromCamera(ndc,camera);
   const hit=ray.intersectObjects(clickable,false)[0];
-  if(hit){focusArt(hit.object);}else{closeCaption();}
+  if(hit){currentIndex=clickable.indexOf(hit.object);focusArt(hit.object);}else{closeCaption();}
 }
+
+/* frecce ‹ › (e tasti freccia) — passa all'opera successiva/precedente senza cliccarci sopra */
+let currentIndex=-1;
+function focusIndex(i){
+  if(!clickable.length)return;
+  currentIndex=((i%clickable.length)+clickable.length)%clickable.length;
+  focusArt(clickable[currentIndex]);
+}
+document.getElementById('navPrev').addEventListener('click',()=>focusIndex(currentIndex-1));
+document.getElementById('navNext').addEventListener('click',()=>focusIndex(currentIndex+1));
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft'){focusIndex(currentIndex-1);hideHint();}
+  if(e.key==='ArrowRight'){focusIndex(currentIndex+1);hideHint();}
+});
+
+/* parallasse camera — l'inquadratura segue leggermente la posizione del mouse */
+let hoverX=0,hoverY=0;
+addEventListener('pointermove',e=>{
+  hoverX=(e.clientX/innerWidth)*2-1;
+  hoverY=(e.clientY/innerHeight)*2-1;
+});
 function focusArt(mesh){
   const a=mesh.userData;
   // orient camera toward the artwork center
@@ -306,7 +380,10 @@ let t0=performance.now();
 function animate(){
   requestAnimationFrame(animate);
   if(!hintHidden){const e=(performance.now()-t0)/1000;tYaw=Math.sin(e*.25)*.18;}
-  yaw+=(tYaw-yaw)*.08;pitch+=(tPitch-pitch)*.08;
+  // il parallasse hover si somma al target ma si disattiva durante il drag manuale
+  const hYaw=dragging?0:hoverX*.12, hPitch=dragging?0:-hoverY*.05;
+  const gYaw=tYaw+hYaw, gPitch=Math.max(-.5,Math.min(.5,tPitch+hPitch));
+  yaw+=(gYaw-yaw)*.06;pitch+=(gPitch-pitch)*.06;
   applyLook();
   renderer.render(scene,camera);
 }
