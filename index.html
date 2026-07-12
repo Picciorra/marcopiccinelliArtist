@@ -180,11 +180,27 @@ app.appendChild(renderer.domElement);
 
 /* room */
 const RW=12,RD=12,RH=5;
-const wallMat=new THREEc.MeshStandardMaterial({color:'#e7e0d3',roughness:.96,metalness:0});
-const floorMat=new THREEc.MeshStandardMaterial({color:'#c9c0b0',roughness:.7,metalness:.05});
+const wallMat=new THREEc.MeshStandardMaterial({color:'#e2dbcd',roughness:.94,metalness:0});
+const floorMat=new THREEc.MeshStandardMaterial({color:'#c9c0b0',roughness:.65,metalness:.05});
 const ceilMat=new THREEc.MeshStandardMaterial({color:'#d8d1c4',roughness:1});
+const trimMat=new THREEc.MeshStandardMaterial({color:'#241f19',roughness:.6,metalness:.15});
 
 function plane(w,h,mat){return new THREEc.Mesh(new THREEc.PlaneGeometry(w,h),mat);}
+// parete con apertura rettangolare (finestra/nicchia) e spessore vero, per non sembrare un cartone piatto
+function wallWithHole(width,height,holeW,holeH,holeU,holeY0,thickness){
+  const shape=new THREEc.Shape();
+  shape.moveTo(-width/2,0);shape.lineTo(width/2,0);shape.lineTo(width/2,height);shape.lineTo(-width/2,height);shape.lineTo(-width/2,0);
+  const hole=new THREEc.Path();
+  const x0=holeU-holeW/2,x1=holeU+holeW/2,y0=holeY0,y1=holeY0+holeH;
+  hole.moveTo(x0,y0);hole.lineTo(x1,y0);hole.lineTo(x1,y1);hole.lineTo(x0,y1);hole.lineTo(x0,y0);
+  shape.holes.push(hole);
+  return new THREEc.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:false,curveSegments:1});
+}
+function trimBox(w,h,d,x,y,z,mat){
+  const m=new THREEc.Mesh(new THREEc.BoxGeometry(w,h,d),mat||trimMat);
+  m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;
+}
+
 // floor
 const floor=plane(RW,RD,floorMat);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
 // ceiling
@@ -193,56 +209,104 @@ const ceil=plane(RW,RD,ceilMat);ceil.rotation.x=Math.PI/2;ceil.position.y=RH;sce
 const back=plane(RW,RH,wallMat);back.position.set(0,RH/2,-RD/2);back.receiveShadow=true;scene.add(back);
 // front wall (behind camera)
 const front=plane(RW,RH,wallMat);front.position.set(0,RH/2,RD/2);front.rotation.y=Math.PI;scene.add(front);
-// left wall
-const left=plane(RD,RH,wallMat);left.position.set(-RW/2,RH/2,0);left.rotation.y=Math.PI/2;left.receiveShadow=true;scene.add(left);
-// right wall
-const right=plane(RD,RH,wallMat);right.position.set(RW/2,RH/2,0);right.rotation.y=-Math.PI/2;right.receiveShadow=true;scene.add(right);
-// panchina in legno (doghe + schienale + gambe) al centro della sala
-function makeWoodCanvas(w=256,h=256){
-  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
-  const x=cv.getContext('2d');const rnd=mulberry32(4);
-  x.fillStyle='#8a5a34';x.fillRect(0,0,w,h);
-  for(let i=0;i<48;i++){
-    const y=rnd()*h;
-    x.strokeStyle=rnd()>.5?'#6b4423':'#a97a4b';
-    x.globalAlpha=.12+rnd()*.22;x.lineWidth=1+rnd()*2;
-    x.beginPath();x.moveTo(0,y);
-    x.bezierCurveTo(w*.3,y+(rnd()-.5)*14,w*.7,y+(rnd()-.5)*14,w,y+(rnd()-.5)*10);
-    x.stroke();
-  }
-  x.globalAlpha=1;
-  return cv;
-}
-const woodTex=new THREEc.CanvasTexture(makeWoodCanvas());
-woodTex.encoding=THREEc.sRGBEncoding;
-const woodMat=new THREEc.MeshStandardMaterial({map:woodTex,roughness:.75,metalness:.05});
-const benchMetalMat=new THREEc.MeshStandardMaterial({color:'#20201f',roughness:.5,metalness:.6});
 
-const benchGroup=new THREEc.Group();
-const slatCount=4,slatW=2.4,slatT=0.05,slatD=0.14,slatGap=0.045;
-const seatDepth=slatCount*slatD+(slatCount-1)*slatGap;
-for(let i=0;i<slatCount;i++){
-  const slat=new THREEc.Mesh(new THREEc.BoxGeometry(slatW,slatT,slatD),woodMat);
-  slat.position.set(0,.45,-seatDepth/2+slatD/2+i*(slatD+slatGap));
-  slat.castShadow=true;slat.receiveShadow=true;benchGroup.add(slat);
+/* --- parete destra: finestra vera, con vetro, telaio e frangisole --- */
+const wallT=.18;
+const WIN={w:2.3,h:2.7,u:4.3,y0:.55};
+const rightGeo=wallWithHole(RD,RH,WIN.w,WIN.h,WIN.u,WIN.y0,wallT);
+const right=new THREEc.Mesh(rightGeo,wallMat);
+right.position.set(RW/2,0,0);right.rotation.y=-Math.PI/2;
+right.castShadow=true;right.receiveShadow=true;scene.add(right);
+
+const glassMat=new THREEc.MeshStandardMaterial({color:'#bcd9e6',transparent:true,opacity:.25,roughness:.05,metalness:0,side:THREEc.DoubleSide});
+const glass=new THREEc.Mesh(new THREEc.PlaneGeometry(WIN.w-.05,WIN.h-.05),glassMat);
+glass.position.set(RW/2-wallT/2,WIN.y0+WIN.h/2,WIN.u);glass.rotation.y=-Math.PI/2;scene.add(glass);
+
+const skyMat=new THREEc.MeshStandardMaterial({color:'#dfe9f2',emissive:'#cfe3f0',emissiveIntensity:.85,roughness:1});
+const sky=new THREEc.Mesh(new THREEc.PlaneGeometry(7,7),skyMat);
+sky.position.set(RW/2+2.4,WIN.y0+WIN.h/2,WIN.u);sky.rotation.y=-Math.PI/2;scene.add(sky);
+
+// telaio della finestra
+const wx=RW/2-wallT-.03;
+trimBox(.06,.06,WIN.w+.12,wx,WIN.y0+WIN.h+.03,WIN.u);
+trimBox(.06,.06,WIN.w+.12,wx,WIN.y0-.03,WIN.u);
+trimBox(.06,WIN.h,.06,wx,WIN.y0+WIN.h/2,WIN.u-WIN.w/2-.03);
+trimBox(.06,WIN.h,.06,wx,WIN.y0+WIN.h/2,WIN.u+WIN.w/2+.03);
+
+// frangisole — doghe angolate davanti alla finestra: disegnano strisce di luce/ombra in sala
+const louverMat=new THREEc.MeshStandardMaterial({color:'#332c22',roughness:.7,metalness:.1});
+const louverCount=7;
+for(let i=0;i<louverCount;i++){
+  const ly=WIN.y0+.2+i*((WIN.h-.4)/(louverCount-1));
+  const lv=new THREEc.Mesh(new THREEc.BoxGeometry(.05,.05,WIN.w+.14),louverMat);
+  lv.position.set(RW/2+.34,ly,WIN.u);lv.rotation.x=.32;
+  lv.castShadow=true;lv.receiveShadow=true;scene.add(lv);
 }
-for(let i=0;i<3;i++){
-  const rail=new THREEc.Mesh(new THREEc.BoxGeometry(slatW,slatD,slatT),woodMat);
-  rail.position.set(0,.62+i*.15,seatDepth/2+.04);
-  rail.rotation.x=.18;
-  rail.castShadow=true;benchGroup.add(rail);
-}
-const legGeo=new THREEc.BoxGeometry(.06,.45,.06);
-[[-1.05,-seatDepth/2+.06],[1.05,-seatDepth/2+.06],[-1.05,seatDepth/2-.06],[1.05,seatDepth/2-.06]].forEach(([x,z])=>{
-  const leg=new THREEc.Mesh(legGeo,benchMetalMat);
-  leg.position.set(x,.225,z);leg.castShadow=true;leg.receiveShadow=true;benchGroup.add(leg);
+
+// luce del sole che entra dalla finestra, filtrata dal frangisole
+const sun=new THREEc.DirectionalLight('#ffedcf',1.05);
+sun.position.set(RW/2+3,WIN.y0+WIN.h*.85,WIN.u+1.4);
+sun.target.position.set(-1,1,WIN.u-1.5);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-9;sun.shadow.camera.right=9;sun.shadow.camera.top=9;sun.shadow.camera.bottom=-9;
+sun.shadow.camera.near=.5;sun.shadow.camera.far=24;sun.shadow.bias=-.0015;
+scene.add(sun);scene.add(sun.target);
+
+/* --- parete sinistra: nicchia con piccola scultura e luce propria --- */
+const left=plane(RD,RH,wallMat);left.position.set(-RW/2,RH/2,0);left.rotation.y=Math.PI/2;left.receiveShadow=true;scene.add(left);
+
+const NICHE={w:1.0,h:1.5,u:4.6,y0:.9,depth:.34};
+const nicheMat=new THREEc.MeshStandardMaterial({color:'#3a352c',roughness:.85});
+const nicheBack=new THREEc.Mesh(new THREEc.PlaneGeometry(NICHE.w,NICHE.h),nicheMat);
+nicheBack.position.set(-RW/2+.07+NICHE.depth,NICHE.y0+NICHE.h/2,NICHE.u);nicheBack.rotation.y=Math.PI/2;
+nicheBack.receiveShadow=true;scene.add(nicheBack);
+trimBox(NICHE.depth,.03,NICHE.w,-RW/2+.07+NICHE.depth/2,NICHE.y0+NICHE.h,NICHE.u,nicheMat);
+trimBox(NICHE.depth,.03,NICHE.w,-RW/2+.07+NICHE.depth/2,NICHE.y0,NICHE.u,nicheMat);
+trimBox(NICHE.depth,NICHE.h,.03,-RW/2+.07+NICHE.depth/2,NICHE.y0+NICHE.h/2,NICHE.u-NICHE.w/2,nicheMat);
+trimBox(NICHE.depth,NICHE.h,.03,-RW/2+.07+NICHE.depth/2,NICHE.y0+NICHE.h/2,NICHE.u+NICHE.w/2,nicheMat);
+// piccolo piedistallo + scultura nella nicchia
+const plinthMat=new THREEc.MeshStandardMaterial({color:'#efeae1',roughness:.9});
+const plinth=new THREEc.Mesh(new THREEc.BoxGeometry(.32,.28,.32),plinthMat);
+plinth.position.set(-RW/2+.07+NICHE.depth*.55,NICHE.y0+.14,NICHE.u);
+plinth.castShadow=true;plinth.receiveShadow=true;scene.add(plinth);
+const sculptMat=new THREEc.MeshStandardMaterial({color:'#c9c0b0',roughness:.4,metalness:.15});
+const sculpt=new THREEc.Mesh(new THREEc.SphereGeometry(.2,24,24),sculptMat);
+sculpt.position.set(-RW/2+.07+NICHE.depth*.55,NICHE.y0+.28+.2,NICHE.u);
+sculpt.castShadow=true;sculpt.receiveShadow=true;scene.add(sculpt);
+const nicheLight=new THREEc.SpotLight('#fff2da',9,2.6,Math.PI/4.5,.5,1.4);
+nicheLight.position.set(-RW/2+.07+NICHE.depth*.4,NICHE.y0+NICHE.h-.03,NICHE.u);
+nicheLight.target=sculpt;nicheLight.castShadow=true;
+scene.add(nicheLight);scene.add(nicheLight.target);
+
+/* --- arco decorativo davanti alla parete di fondo --- */
+const archMat=new THREEc.MeshStandardMaterial({color:'#d8d0c0',roughness:.85});
+const archInnerW=3.2,archPillarH=2.6,pillarR=.15,archZ=-RD/2+1.1;
+[-1,1].forEach(side=>{
+  const pillar=new THREEc.Mesh(new THREEc.CylinderGeometry(pillarR,pillarR*1.15,archPillarH,20),archMat);
+  pillar.position.set(side*archInnerW/2,archPillarH/2,archZ);
+  pillar.castShadow=true;pillar.receiveShadow=true;scene.add(pillar);
 });
-benchGroup.position.set(0,0,.5);
-scene.add(benchGroup);
+const archCurve=new THREEc.Mesh(new THREEc.TorusGeometry(archInnerW/2,pillarR,12,24,Math.PI),archMat);
+archCurve.position.set(0,archPillarH,archZ);
+archCurve.castShadow=true;archCurve.receiveShadow=true;
+scene.add(archCurve);
 
 /* lighting */
-scene.add(new THREEc.HemisphereLight('#fff6e8','#3a332a',.55));
-const amb=new THREEc.AmbientLight('#ffffff',.18);scene.add(amb);
+scene.add(new THREEc.HemisphereLight('#fff6e8','#332c22',.4));
+const amb=new THREEc.AmbientLight('#ffffff',.12);scene.add(amb);
+
+// plafoniere a soffitto — punti luce veri e visibili, non solo faretti fantasma
+function ceilingLight(x,z){
+  const housing=new THREEc.Mesh(new THREEc.CylinderGeometry(.15,.17,.07,20),
+    new THREEc.MeshStandardMaterial({color:'#141210',roughness:.4,metalness:.6}));
+  housing.position.set(x,RH-.035,z);housing.castShadow=true;scene.add(housing);
+  const bulb=new THREEc.Mesh(new THREEc.CircleGeometry(.115,20),
+    new THREEc.MeshStandardMaterial({color:'#fff3d6',emissive:'#ffedbc',emissiveIntensity:1.8,roughness:.4}));
+  bulb.rotation.x=Math.PI/2;bulb.position.set(x,RH-.071,z);scene.add(bulb);
+  const pl=new THREEc.PointLight('#ffdfa8',2.6,6.5,2.2);
+  pl.position.set(x,RH-.3,z);scene.add(pl);
+}
+[[-3.2,-3],[3.2,-3],[-3.2,1],[3.2,1],[0,-4.5]].forEach(([x,z])=>ceilingLight(x,z));
 
 /* artworks */
 const clickable=[];
@@ -304,23 +368,22 @@ function addArtwork(a){
 })();
 
 /* =========================================================
-   INTERAZIONE — look con drag (yaw/pitch) + focus al clic
+   INTERAZIONE — look con drag solo orizzontale (yaw) + focus al clic
+   Nessuna inclinazione verticale: la vista resta sempre dritta.
 ========================================================= */
-let yaw=0,pitch=0,tYaw=0,tPitch=0;
+let yaw=0,tYaw=0;
 let dragging=false,lastX=0,lastY=0,moved=0;
 const dir=new THREEc.Vector3();
 function applyLook(){
-  const cy=Math.cos(pitch);
-  dir.set(Math.sin(yaw)*cy,Math.sin(pitch),-Math.cos(yaw)*cy);
+  dir.set(Math.sin(yaw),0,-Math.cos(yaw));
   camera.lookAt(camera.position.x+dir.x,camera.position.y+dir.y,camera.position.z+dir.z);
 }
 const cvEl=renderer.domElement;
 cvEl.addEventListener('pointerdown',e=>{dragging=true;moved=0;lastX=e.clientX;lastY=e.clientY;cvEl.setPointerCapture(e.pointerId);});
 cvEl.addEventListener('pointermove',e=>{
   if(!dragging)return;
-  const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
-  tYaw-=dx*.004;tPitch-=dy*.004;
-  tPitch=Math.max(-.5,Math.min(.5,tPitch));
+  const dx=e.clientX-lastX;lastX=e.clientX;lastY=e.clientY;moved+=Math.abs(dx);
+  tYaw-=dx*.004;
   hideHint();
 });
 cvEl.addEventListener('pointerup',e=>{
@@ -352,19 +415,17 @@ addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'){focusIndex(currentIndex+1);hideHint();}
 });
 
-/* parallasse camera — l'inquadratura segue leggermente la posizione del mouse */
-let hoverX=0,hoverY=0;
+/* parallasse camera — l'inquadratura segue leggermente la posizione orizzontale del mouse */
+let hoverX=0;
 addEventListener('pointermove',e=>{
   hoverX=(e.clientX/innerWidth)*2-1;
-  hoverY=(e.clientY/innerHeight)*2-1;
 });
 function focusArt(mesh){
   const a=mesh.userData;
-  // orient camera toward the artwork center
+  // ruota la vista verso l'opera cliccata (solo asse orizzontale)
   const wp=new THREEc.Vector3();mesh.getWorldPosition(wp);
   const v=wp.clone().sub(camera.position).normalize();
   tYaw=Math.atan2(v.x,-v.z);
-  tPitch=Math.max(-.5,Math.min(.5,Math.asin(v.y)));
   // fill caption
   document.getElementById('cTitle').textContent=a.t;
   document.getElementById('cYear').textContent=a.y;
@@ -396,9 +457,9 @@ function animate(){
   requestAnimationFrame(animate);
   if(!hintHidden){const e=(performance.now()-t0)/1000;tYaw=Math.sin(e*.25)*.18;}
   // il parallasse hover si somma al target ma si disattiva durante il drag manuale
-  const hYaw=dragging?0:hoverX*.12, hPitch=dragging?0:-hoverY*.05;
-  const gYaw=tYaw+hYaw, gPitch=Math.max(-.5,Math.min(.5,tPitch+hPitch));
-  yaw+=(gYaw-yaw)*.06;pitch+=(gPitch-pitch)*.06;
+  const hYaw=dragging?0:hoverX*.12;
+  const gYaw=tYaw+hYaw;
+  yaw+=(gYaw-yaw)*.06;
   applyLook();
   renderer.render(scene,camera);
 }
