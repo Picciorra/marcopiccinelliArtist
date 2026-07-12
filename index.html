@@ -24,25 +24,32 @@
     border-radius:40px;backdrop-filter:blur(6px);transition:opacity .6s}
   .hint b{color:var(--gold);font-weight:600}
 
-  /* caption panel */
-  .caption{position:fixed;z-index:12;right:30px;top:50%;transform:translateY(-50%) translateX(30px);
-    width:min(300px,80vw);background:rgba(18,15,11,.82);backdrop-filter:blur(14px);
-    border:1px solid rgba(198,154,46,.35);padding:26px 26px 24px;border-radius:4px;
-    opacity:0;pointer-events:none;transition:opacity .45s,transform .45s}
-  .caption.show{opacity:1;transform:translateY(-50%) translateX(0)}
-  .caption .k{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold)}
-  .caption h2{font-size:24px;font-weight:800;margin:10px 0 4px;letter-spacing:.01em;line-height:1.1}
-  .caption .yr{font-size:14px;color:#b6ab97;margin-bottom:16px}
-  .caption .row{display:flex;justify-content:space-between;font-size:14px;padding:9px 0;
-    border-top:1px solid rgba(255,255,255,.1);color:#d8cdba}
-  .caption .row span:first-child{color:#8f8474}
-  .badge{display:inline-block;margin-top:16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  /* lightbox — visualizzazione opera a schermo intero (mobile-friendly) */
+  .lightbox{position:fixed;inset:0;z-index:14;background:rgba(10,8,6,.94);backdrop-filter:blur(4px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    padding:70px 90px 26px;opacity:0;pointer-events:none;transition:opacity .4s}
+  .lightbox.show{opacity:1;pointer-events:auto}
+  .lightbox .lbImgWrap{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:2px;
+    box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .lightbox .lbClose{position:absolute;top:22px;right:26px;width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);display:flex;
+    align-items:center;justify-content:center;cursor:pointer;transition:background .25s}
+  .lightbox .lbClose:hover{background:rgba(198,154,46,.3)}
+  .lightbox .lbClose svg{width:18px;height:18px;stroke:var(--cream);stroke-width:2.2}
+  .lightbox .info{flex:0 0 auto;width:100%;max-width:640px;padding-top:20px;text-align:center}
+  .lightbox .k{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold)}
+  .lightbox h2{font-size:22px;font-weight:800;margin:8px 0 4px;letter-spacing:.01em;line-height:1.2}
+  .lightbox .yr{font-size:13px;color:#b6ab97;margin-bottom:10px}
+  .lightbox .meta{display:flex;justify-content:center;gap:22px;font-size:13px;color:#d8cdba;flex-wrap:wrap}
+  .lightbox .meta span:first-child{color:#8f8474;margin-right:5px}
+  .badge{display:inline-block;margin-top:14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
     padding:5px 12px;color:#fff;border-radius:2px}
   .badge.available{background:#3f7ea8}.badge.sold{background:#8a4a3f}
-  .caption .close{pointer-events:auto;cursor:pointer;margin-top:20px;font-size:12px;
-    letter-spacing:.1em;text-transform:uppercase;color:#8f8474;border-bottom:1px solid #8f8474;
-    display:inline-block;padding-bottom:2px}
-  .caption .close:hover{color:var(--gold);border-color:var(--gold)}
+  @media (max-width:640px){
+    .lightbox{padding:60px 54px 18px}
+    .lightbox h2{font-size:19px}
+  }
 
   .loader{position:fixed;inset:0;z-index:20;background:#0e0c0a;display:flex;align-items:center;
     justify-content:center;flex-direction:column;gap:16px;transition:opacity .8s}
@@ -53,7 +60,7 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* navigation arrows — cambia opera senza doverci cliccare sopra */
-  .navArrow{position:fixed;top:50%;transform:translateY(-50%);z-index:11;width:52px;height:52px;
+  .navArrow{position:fixed;top:50%;transform:translateY(-50%);z-index:16;width:52px;height:52px;
     border-radius:50%;background:rgba(20,16,12,.5);border:1px solid rgba(255,255,255,.12);
     backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;
     cursor:pointer;pointer-events:auto;transition:background .25s,border-color .25s;user-select:none}
@@ -71,15 +78,19 @@
 <div class="ui title"><h1>Marco Piccinelli</h1><p>GALLERIA VIRTUALE · ILLUSIONI ONIRICHE</p></div>
 <div class="ui hint" id="hint"><b>Trascina</b> per guardarti intorno · <b>Clicca</b> un'opera · <b>‹ ›</b> per cambiare</div>
 
-<div class="caption" id="caption">
-  <div class="k">Opera</div>
-  <h2 id="cTitle"></h2>
-  <div class="yr" id="cYear"></div>
-  <div class="row"><span>Tecnica</span><span>Inchiostro su MDF</span></div>
-  <div class="row"><span>Dimensioni</span><span id="cDims"></span></div>
-  <div class="row"><span>Stato</span><span id="cStatusText"></span></div>
-  <span class="badge" id="cBadge"></span><br>
-  <span class="close" id="cClose">Torna alla galleria ✕</span>
+<div class="lightbox" id="caption">
+  <div class="lbClose" id="cClose" aria-label="Chiudi"><svg viewBox="0 0 24 24"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></div>
+  <div class="lbImgWrap"><img id="cImg" alt=""></div>
+  <div class="info">
+    <div class="k">Opera</div>
+    <h2 id="cTitle"></h2>
+    <div class="yr" id="cYear"></div>
+    <div class="meta">
+      <span><span>Dimensioni</span><span id="cDims"></span></span>
+      <span><span>Stato</span><span id="cStatusText"></span></span>
+    </div>
+    <span class="badge" id="cBadge"></span>
+  </div>
 </div>
 
 <div class="navArrow left" id="navPrev" aria-label="Opera precedente"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
@@ -361,10 +372,14 @@ function focusArt(mesh){
   const stTxt=a.st==='available'?'Disponibile':'Venduta';
   document.getElementById('cStatusText').textContent=stTxt;
   const b=document.getElementById('cBadge');b.textContent=stTxt;b.className='badge '+a.st;
+  // immagine: foto reale se caricata, altrimenti texture segnaposto generata in alta risoluzione
+  const img=document.getElementById('cImg');
+  img.src=a.image||makeArtCanvas(a.seed||11,a.pi||0,1024,1280).toDataURL();
   capEl.classList.add('show');hideHint();
 }
 function closeCaption(){capEl.classList.remove('show');}
 document.getElementById('cClose').addEventListener('click',closeCaption);
+addEventListener('keydown',e=>{if(e.key==='Escape')closeCaption();});
 
 let hintHidden=false;
 function hideHint(){if(hintHidden)return;hintHidden=true;const h=document.getElementById('hint');h.style.opacity=0;}
